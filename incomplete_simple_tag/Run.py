@@ -16,7 +16,7 @@ START_EPISODE = 50000
 MAX_EPISODE = 10000000
 CAPACITY = 1000000
 BATCH_SIZE = 1024
-NOISE_BOTTOM = 0.1
+NOISE_BOTTOM = 3
 
 if __name__ == '__main__':
     
@@ -58,13 +58,13 @@ if __name__ == '__main__':
         
         reward_info[episode % 1000] = reward[0] + reward[1] + reward[2]
         
-        buf_1.add(np.hstack([observation[0],observation[1],observation[2]]),np.hstack([action_1,action_2,action_3]).ravel(),np.hstack([reward[0]]),np.hstack([observation[0],observation[1],observation[2]]))
-        buf_2.add(np.hstack([observation[1],observation[2],observation[0]]),np.hstack([action_2,action_3,action_1]).ravel(),np.hstack([reward[1]]),np.hstack([observation[1],observation[2],observation[0]]))
-        buf_3.add(np.hstack([observation[2],observation[0],observation[1]]),np.hstack([action_3,action_1,action_2]).ravel(),np.hstack([reward[2]]),np.hstack([observation[2],observation[0],observation[1]]))
+        buf_1.add(np.hstack([observation[0],observation[1],observation[2]]),np.hstack([action_1,action_2,action_3]).ravel(),np.hstack([reward[0]]),np.hstack([observation_[0],observation_[1],observation_[2]]))
+        buf_2.add(np.hstack([observation[1],observation[2],observation[0]]),np.hstack([action_2,action_3,action_1]).ravel(),np.hstack([reward[1]]),np.hstack([observation_[1],observation_[2],observation_[0]]))
+        buf_3.add(np.hstack([observation[2],observation[0],observation[1]]),np.hstack([action_3,action_1,action_2]).ravel(),np.hstack([reward[2]]),np.hstack([observation_[2],observation_[0],observation_[1]]))
 
         running_reward = 0.9999 * running_reward + 0.0001 * np.sum(reward_info)
         
-        if (episode >= START_EPISODE):
+        if (episode >= START_EPISODE-1):
             sample_index_1 = buf_1.get_sample_index()
             sample_index_2 = buf_2.get_sample_index()
             sample_index_3 = buf_3.get_sample_index()

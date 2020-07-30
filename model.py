@@ -62,10 +62,12 @@ class maddpg(object):
         indiv_observations = []
         for i in range(self.env.n):
             indiv_observations.append(torch.FloatTensor(np.vstack([observations[b][i] for b in range(self.batch_size)])))
-        actions_stack = np.vstack([np.hstack(actions[i]) for i in range(len(actions))])
         indiv_actions = []
         for i in range(self.env.n):
-            indiv_actions.append(torch.FloatTensor(np.vstack([actions[b][i] for b in range(self.batch_size)])))
+            tmp_action = torch.zeros(total_observations.size(0), self.env.action_space[i].n)
+            action_idx = torch.LongTensor(actions)[:, i].unsqueeze(-1)
+            tmp_action.scatter_(dim=1, index=action_idx, value=1)
+            indiv_actions.append(tmp_action)
         total_actions = torch.cat(indiv_actions, dim=1)
         rewards = torch.FloatTensor(rewards)
         indiv_rewards = []
@@ -98,14 +100,14 @@ class maddpg(object):
         for _ in range(self.policy_iter):
             for i in range(self.env.n):
                 prob, entropy = self.policy_nets[i].forward(indiv_observations[i])
-                #action_idx = torch.LongTensor(actions)[:, i].unsqueeze(1)
-                #action_prob = prob.gather(dim=1, index=action_idx)
-                #policy_loss = -self.value_nets[i].forward(total_observations, total_actions).detach() * action_prob.log() - self.entropy_weight * entropy
+                action_idx = torch.LongTensor(actions)[:, i].unsqueeze(1)
+                action_prob = prob.gather(dim=1, index=action_idx)
+                policy_loss = -self.value_nets[i].forward(total_observations, total_actions).detach() * action_prob.log() - self.entropy_weight * entropy
 
-                new_action = copy.deepcopy(indiv_actions)
-                new_action[i] = prob
-                new_actions = torch.cat(new_action, dim=1)
-                policy_loss = - self.value_nets[i].forward(total_observations, new_actions) - self.entropy_weight * entropy
+                #new_action = copy.deepcopy(indiv_actions)
+                #new_action[i] = prob
+                #new_actions = torch.cat(new_action, dim=1)
+                #policy_loss = -self.value_nets[i].forward(total_observations, new_actions) - self.entropy_weight * entropy
 
                 policy_loss = policy_loss.mean()
 
@@ -115,7 +117,7 @@ class maddpg(object):
                 self.policy_optimizers[i].step()
 
         self.soft_update()
-        #self.buffer.clear()
+        self.buffer.clear()
 
     def run(self):
         weight_reward = [None for i in range(self.env.n)]
@@ -125,14 +127,16 @@ class maddpg(object):
             if self.render:
                 self.env.render()
             while True:
-                actions = []
+                actions = [np.zeros(self.env.action_space[i].n) for i in range(self.env.n)]
+                actions_indice = []
                 for n in range(self.env.n):
-                    action = self.policy_nets[n].act(torch.FloatTensor(np.expand_dims(obs[n], 0)))
-                    actions.append(action)
+                    action_idx = self.policy_nets[n].act(torch.FloatTensor(np.expand_dims(obs[n], 0)))
+                    actions[n][action_idx] = 1
+                    actions_indice.append(action_idx)
                 next_obs, reward, done, info = self.env.step(actions)
                 if self.render:
                     self.env.render()
-                self.buffer.store(obs, actions, reward, next_obs, done)
+                self.buffer.store(obs, actions_indice, reward, next_obs, done)
                 self.count += 1
                 total_reward = [total_reward[i] + reward[i] for i in range(self.env.n)]
                 obs = next_obs
@@ -186,7 +190,7 @@ if __name__ == '__main__':
         episode=150000,
         learning_rate=5e-3,
         gamma=0.97,
-        capacity=100000,
+        capacity=10000,
         batch_size=128,
         value_iter=1,
         policy_iter=1,

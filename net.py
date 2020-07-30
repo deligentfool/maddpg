@@ -26,7 +26,9 @@ class policy_net(nn.Module):
 
     def act(self, input):
         prob, _ = self.forward(input)
-        return prob.detach().numpy()[0]
+        dist = torch.distributions.Categorical(prob)
+        action = dist.sample()
+        return action.detach().item()
 
 
 class value_net(nn.Module):

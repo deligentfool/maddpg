@@ -12,7 +12,7 @@ import os
 import time
 import copy
 import argparse
-
+from gym.spaces.discrete import Discrete
 
 class maddpg(object):
     def __init__(self, env_id, episode, learning_rate, gamma, capacity, batch_size, value_iter, policy_iter, rho, episode_len, render, train_freq, entropy_weight, start_count=10000, model_path=False):
@@ -35,9 +35,9 @@ class maddpg(object):
         self.observation_dims = self.env.observation_space
         self.action_dims = self.env.action_space
         self.observation_total_dims = sum([self.env.observation_space[i].shape[0] for i in range(self.env.n)])
-        self.action_total_dims = sum([self.env.action_space[i].n for i in range(self.env.n)])
-        self.policy_nets = [policy_net(self.observation_dims[i].shape[0], self.action_dims[i].n) for i in range(self.env.n)]
-        self.target_policy_nets = [policy_net(self.observation_dims[i].shape[0], self.action_dims[i].n) for i in range(self.env.n)]
+        self.action_total_dims = sum([self.env.action_space[i].n if isinstance(self.env.action_space[i], Discrete) else sum(self.env.action_space[i].high) + self.env.action_space[i].shape for i in range(self.env.n)])
+        self.policy_nets = [policy_net(self.observation_dims[i].shape[0], self.action_dims[i].n if isinstance(self.env.action_space[i], Discrete) else sum(self.env.action_space[i].high) + self.env.action_space[i].shape) for i in range(self.env.n)]
+        self.target_policy_nets = [policy_net(self.observation_dims[i].shape[0], self.action_dims[i].n if isinstance(self.env.action_space[i], Discrete) else sum(self.env.action_space[i].high) + self.env.action_space[i].shape) for i in range(self.env.n)]
         self.value_nets = [value_net(self.observation_total_dims, self.action_total_dims, 1) for i in range(self.env.n)]
         self.target_value_nets = [value_net(self.observation_total_dims, self.action_total_dims, 1) for i in range(self.env.n)]
         self.policy_optimizers = [torch.optim.Adam(policy_net.parameters(), lr=self.learning_rate) for policy_net in self.policy_nets]
@@ -130,6 +130,7 @@ class maddpg(object):
                 for n in range(self.env.n):
                     action = self.policy_nets[n].act(torch.FloatTensor(np.expand_dims(obs[n], 0)))
                     actions.append(action)
+                # * The action is real-value, not one-hot.
                 next_obs, reward, done, info = self.env.step(actions)
                 if self.render:
                     self.env.render()
@@ -166,6 +167,7 @@ class maddpg(object):
             if self.render:
                 self.env.render()
             while True:
+                time.sleep(0.05)
                 actions = []
                 for n in range(self.env.n):
                     action = self.policy_nets[n].act(torch.FloatTensor(np.expand_dims(obs[n], 0)))
